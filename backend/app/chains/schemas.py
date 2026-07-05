@@ -4,6 +4,22 @@ from dataclasses import dataclass, field
 
 
 @dataclass(frozen=True)
+class CandidateClipOutput:
+    start_sec: float
+    end_sec: float
+    reason: str
+    highlight: str
+    confidence: float
+    transcript_text: str = ""
+
+
+@dataclass(frozen=True)
+class CandidateDetectionOutput:
+    candidates: list[CandidateClipOutput] = field(default_factory=list)
+    prompt_version: str = "candidate-detection-v1"
+
+
+@dataclass(frozen=True)
 class ClipContext:
     clip_id: str
     transcript_text: str

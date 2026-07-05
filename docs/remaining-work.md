@@ -49,6 +49,7 @@
 
 涉及文件：
 
+- `backend/app/chains/candidate_detection.py`
 - `backend/app/chains/clip_scoring.py`
 - `backend/app/chains/publish_copy.py`
 - `backend/app/chains/risk_review.py`

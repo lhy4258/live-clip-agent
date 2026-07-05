@@ -7,8 +7,9 @@
 面试讲法重点：
 
 - 这是一个多模态内容流水线，不是简单文案生成器。
-- ffmpeg、ASR、规则引擎负责确定性处理。
-- LangChain 只用于语义评分、标题简介标签生成、风险审核这类判断和生成任务。
+- ffmpeg、ASR、数据库写入、时间边界校验负责确定性处理。
+- LangChain 用于候选片段识别、语义评分、标题简介标签生成、风险审核这类判断和生成任务。
+- 后端采用单 Agent 多 Tool 架构：`LiveClipAgent` 负责流程编排，普通 Tool 负责确定性动作，Chain Tool 负责大模型语义任务。
 - 人工审核保留最终控制权，系统不自动发布到平台。
 
 ## 2. 技术栈
@@ -74,12 +75,14 @@ flowchart LR
   UI["Vue + Vite 管理台"] --> API["FastAPI /api/v1/video-ops"]
   API --> DB["PostgreSQL live-stream-clip-agent"]
   API --> RQ["Redis/RQ 异步任务"]
-  RQ --> FF["ffmpeg 音频提取"]
-  RQ --> ASR["Whisper-compatible ASR"]
-  RQ --> Rule["ClipRuleEngine"]
-  Rule --> LC["LangChain Chains"]
+  RQ --> Agent["LiveClipAgent"]
+  Agent --> ASR["ASR Tool"]
+  Agent --> Tools["普通 Tools"]
+  Agent --> LC["Chain Tools"]
+  ASR --> DB
   LC --> LLM["OpenAI-compatible LLM 或 mock"]
   LC --> DB
+  Tools --> DB
   API --> Export["CSV/JSON 导出"]
 ```
 
@@ -88,16 +91,19 @@ flowchart LR
 1. 运营人员在前端登记视频路径或上传视频。
 2. 后端记录 `source_videos`。
 3. 转写任务读取视频，提取音频并生成 `transcript_segments`。
-4. 切片任务用规则引擎生成 20-90 秒候选片段。
-5. LangChain 对候选片段做结构化评分、运营文案生成和风险审核。
-6. 人工审核确认或拒绝切片。
-7. 确认后的切片生成 `publish_plans`。
-8. 前端导出 CSV 或 JSON 发布清单。
+4. `LiveClipAgent` 调用 `detect_candidates_tool`，由 `CandidateDetectionChain` 从转写时间轴中选择候选片段。
+5. 普通代码校验候选片段时间范围、文本范围和重叠情况，防止模型编造不存在的时间段。
+6. `LiveClipAgent` 继续调用评分、运营文案和风险审核 Chain Tool。
+7. `save_clip_tool` 保存候选切片记录。
+8. 人工审核确认或拒绝切片。
+9. 确认后的切片生成 `publish_plans`。
+10. 前端导出 CSV 或 JSON 发布清单。
 
 ## 5. LangChain 使用边界
 
 使用 LangChain 的地方：
 
+- `CandidateDetectionChain`：从带时间戳的转写片段中选择候选切片时间段，输出 `start_sec`、`end_sec`、`reason`、`highlight`、`confidence`。
 - `ClipScoringChain`：判断 hook、value_point、audience、semantic_score。
 - `PublishCopyChain`：生成标题、简介、标签、封面文案。
 - `RiskReviewChain`：辅助判断夸大承诺、敏感表达、合规风险。
@@ -110,7 +116,8 @@ flowchart LR
 - 任务重试。
 - 文件路径判断。
 - CSV/JSON 导出。
-- 是否调用某个工具或服务的路由决策。
+- Agent 固定流程编排、工具调用顺序、任务状态回写。
+- 候选片段时间边界校验、去重和数据库保存。
 
 原因：这些逻辑是确定性业务规则，代码比模型更可靠、可测试、可审计。
 
@@ -121,6 +128,8 @@ flowchart LR
 ```text
 backend/
   app/
+    agents/
+      live_clip_agent.py
     api/
       deps.py
       v1/
@@ -131,6 +140,7 @@ backend/
         chain_runs.py
     chains/
       schemas.py
+      candidate_detection.py
       clip_scoring.py
       publish_copy.py
       risk_review.py
@@ -155,12 +165,21 @@ backend/
       storage.py
       tasks.py
       transcription.py
+    tools/
+      transcription_tool.py
+      candidate_detection_tool.py
+      clip_scoring_tool.py
+      publish_copy_tool.py
+      risk_review_tool.py
+      save_clip_tool.py
     main.py
 ```
 
 职责：
 
 - `api`：参数校验、鉴权、调用 service。
+- `agents`：`LiveClipAgent` 单 Agent 编排入口。
+- `tools`：Agent 可调用能力，分为普通 Tool 和 Chain Tool。
 - `services`：确定性业务逻辑。
 - `chains`：LangChain 结构化输入输出。
 - `db/init_sql.py`：唯一建表 SQL 来源，使用 `CREATE TABLE IF NOT EXISTS`。
@@ -307,7 +326,7 @@ DBX 的角色：
 
 ### chain_runs
 
-记录 LangChain 调用链。
+记录 LangChain 调用链。候选片段识别、片段评分、发布文案、风险审核都会写入该表，便于按 `trace_id` 查看一次任务的完整模型调用路径。
 
 字段：
 
@@ -549,6 +568,7 @@ LLM 不可用：
 
 - `.env` 设置 `LLM_MOCK=true`。
 - LangChain chain 使用 mock structured output。
+- `CandidateDetectionChain` 的 mock 模式会生成可演示候选片段，真实模型不可用时仍能跑通本地流程。
 
 ffmpeg 不可用：
 
@@ -557,7 +577,8 @@ ffmpeg 不可用：
 
 切片质量差：
 
-- 调整 `ClipRuleEngine` 的关键词、时间窗、低价值过滤。
+- 调整 `CandidateDetectionChain` 的提示词、输出约束和候选数量。
+- 调整普通代码里的时间边界、最大时长和重叠去重阈值。
 - 增加人工标注样本作为评测集。
 
 ## 12. 本地启动

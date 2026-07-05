@@ -1,21 +1,16 @@
 from __future__ import annotations
 
 from app.core.database import SessionLocal
-from app.models.tables import AgentTask, SourceVideo
+from app.models.tables import AgentTask
 from app.services.agent_pipeline import VideoOpsAgentPipeline
 from app.services.tasks import mark_task_failed, mark_task_running, mark_task_succeeded
-from app.services.transcription import TranscriptionService
 
 
 def transcribe_video_job(task_id: str, video_id: str) -> None:
     db = SessionLocal()
     try:
         mark_task_running(db, task_id)
-        video = db.get(SourceVideo, video_id)
-        if video is None:
-            raise ValueError(f"Video {video_id} not found")
-        segments = TranscriptionService(mock=True).transcribe(video.file_uri)
-        count = VideoOpsAgentPipeline(db).save_transcript(video_id=video_id, segments=segments)
+        count = VideoOpsAgentPipeline(db).transcribe_video(video_id)
         mark_task_succeeded(db, task_id, {"segments": count})
     except Exception as exc:
         mark_task_failed(db, task_id, exc, {"stage": "transcribe", "video_id": video_id})
