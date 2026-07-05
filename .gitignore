@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+venv/
+node_modules/
+node_modules.pnpm-broken*/
+dist/
+.env
+data/files/
+*.log
