@@ -6,7 +6,7 @@ from app.services.transcription import TranscriptionService
 
 class TranscriptionTool:
     def __init__(self, service: TranscriptionService | None = None) -> None:
-        self.service = service if service is not None else TranscriptionService(mock=True)
+        self.service = service if service is not None else TranscriptionService()
 
-    def run(self, video_uri: str) -> list[TranscriptSegment]:
-        return self.service.transcribe(video_uri)
+    def run(self, video_uri: str, duration_sec: float | None = None) -> list[TranscriptSegment]:
+        return self.service.transcribe(video_uri, duration_sec=duration_sec)

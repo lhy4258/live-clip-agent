@@ -11,33 +11,35 @@
 
 ## 后端必补
 
-### 1. 接入真实 ASR 和 ffmpeg 音频处理
+### 1. 真实 ASR 联调验收
 
 当前状态：
 
-- `backend/app/services/transcription.py` 默认返回 mock 转写。
-- `mock=False` 时会抛出 `NotImplementedError`。
-- ffmpeg 依赖已规划，但真实音频提取和 ASR 调用还没接入。
+- `backend/app/services/transcription.py` 已支持 `mock` 和 `aliyun_qwen3_asr_flash`。
+- `aliyun_qwen3_asr_flash` 会将本地视频用 ffmpeg 抽成 mp3，再以 Base64 Data URL 调用 qwen3-asr-flash。
+- qwen3-asr-flash 限制单段音频不超过 5 分钟，后续上传或转写前需要保证视频时长不超过 5 分钟。
+- ffmpeg 已用于人工审核后的短视频切片导出。
+- 还没有使用真实 DashScope API Key 和真实视频完成联调验收。
 
 涉及文件：
 
 - `backend/app/services/transcription.py`
 - `backend/app/jobs/pipeline.py`
 - `backend/app/core/config.py`
-- `backend/requirements.txt`
+- `backend/.env.example`
 - `docs/technical-design.md`
 
 完成标准：
 
-- 支持从视频文件提取音频。
-- 支持调用 Whisper-compatible ASR 或明确配置的本地/远程 ASR。
-- ASR 返回内容能写入 `transcript_segments`。
+- 配置 `ASR_PROVIDER=aliyun_qwen3_asr_flash` 和真实 `ASR_API_KEY` 后，能调用 qwen3-asr-flash。
+- 本地上传视频能先抽取音频，再完成转写。
+- ASR 返回文本能写入 `transcript_segments`，时间段按视频总时长近似分配。
 - mock 模式仍然保留，便于没有 ASR 环境时演示。
 
 验证方式：
 
-- 使用真实视频执行转写。
-- `transcript_segments` 里出现真实时间戳和文本。
+- 使用 5 分钟以内真实视频执行转写。
+- `transcript_segments` 里出现真实转写文本和近似时间段。
 - mock=true 时仍能跑通 demo 流程。
 
 ### 2. LangChain 模型配置化
@@ -72,7 +74,7 @@
 
 当前状态：
 
-- 已有后端单元测试。
+- 已有后端单元测试和分散的接口测试。
 - 还缺从视频登记到发布清单导出的完整 API 流程测试。
 
 涉及文件：
@@ -83,12 +85,8 @@
 
 完成标准：
 
-- 覆盖视频登记。
-- 覆盖转写任务创建。
-- 覆盖候选切片生成。
-- 覆盖人工审核。
-- 覆盖发布计划生成。
-- 覆盖 CSV/JSON 导出。
+- 新增一条不依赖真实 LLM 的完整 API 流程测试。
+- 测试串联视频登记、转写任务创建、候选切片生成、人工审核、发布计划生成、CSV/JSON 导出。
 
 验证方式：
 

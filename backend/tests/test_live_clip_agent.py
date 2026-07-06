@@ -13,7 +13,7 @@ from app.tools.candidate_detection_tool import CandidateDetectionTool
 
 
 class FakeTranscriptionTool:
-    def run(self, video_uri):
+    def run(self, video_uri, duration_sec=None):
         return [
             TranscriptSegment(
                 start_sec=0,

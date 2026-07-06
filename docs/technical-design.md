@@ -24,6 +24,7 @@
 - ffmpeg-python
 - LangChain
 - OpenAI-compatible LLM
+- 阿里百炼 qwen3-asr-flash ASR
 
 前端：
 
@@ -50,9 +51,16 @@
 CREATE DATABASE "live-stream-clip-agent";
 ```
 
-默认 `.env`：
+后端配置：
+
+- `backend/app/core/config.py` 只声明配置字段和类型，不写数据库地址、Redis 地址、模型名、API Key、服务地址等资源值。
+- 本地运行读取 `backend/.env`。
+- `backend/.env.example` 是可提交的模板，真实密钥只写入本机 `.env`。
+
+默认 `.env` 模板：
 
 ```env
+APP_NAME=Live Stream Clip Agent
 DATABASE_URL=postgresql+psycopg://postgres:postgres@localhost:5432/live-stream-clip-agent
 REDIS_URL=redis://localhost:6379/0
 STORAGE_DIR=data/files
@@ -62,6 +70,14 @@ LLM_API_KEY=
 LLM_MODEL=gpt-4.1-mini
 LLM_MOCK=true
 LANGSMITH_TRACING=false
+ASR_PROVIDER=mock
+ASR_MODEL=qwen3-asr-flash
+ASR_API_KEY=
+ASR_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions
+ASR_MAX_DURATION_SEC=300
+ASR_MAX_PAYLOAD_BYTES=10485760
+ASR_SEGMENT_DURATION_SEC=30
+ASR_REQUEST_TIMEOUT_SEC=60
 FRONTEND_ORIGIN=http://localhost:5173
 FRONTEND_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
 ```
@@ -92,7 +108,7 @@ flowchart LR
 
 1. 运营人员在前端登记视频路径或上传视频。
 2. 后端记录 `source_videos`。
-3. 转写任务读取视频，提取音频并生成 `transcript_segments`。
+3. 转写任务读取视频，`mock` 模式直接生成 demo 转写；`aliyun_qwen3_asr_flash` 模式用 ffmpeg 从本地视频抽取 mp3 音频，再以 Base64 Data URL 调用 qwen3-asr-flash，生成 `transcript_segments`。
 4. `LiveClipAgent` 调用 `detect_candidates_tool`，由 `CandidateDetectionChain` 从转写时间轴中选择候选片段。
 5. 普通代码校验候选片段时间范围、文本范围和重叠情况，防止模型编造不存在的时间段。
 6. `LiveClipAgent` 继续调用评分、运营文案和风险审核 Chain Tool。
@@ -187,6 +203,7 @@ backend/
 - `agents`：`LiveClipAgent` 单 Agent 编排入口。
 - `tools`：Agent 可调用能力，分为普通 Tool 和 Chain Tool。
 - `services`：确定性业务逻辑。
+- `services/transcription.py`：ASR 边界。支持 `mock` 和 `aliyun_qwen3_asr_flash`，真实模式下负责视频抽音频、Base64 Data URL 构造、调用阿里百炼 OpenAI 兼容接口、把文本切成时间段。
 - `chains`：LangChain 结构化输入输出。
 - `db/init_sql.py`：唯一建表 SQL 来源，使用 `CREATE TABLE IF NOT EXISTS`。
 - `jobs`：长任务入口。
@@ -403,6 +420,15 @@ DBX 的角色：
 
 创建转写任务。
 
+真实 ASR 配置：
+
+- `ASR_PROVIDER=mock`：默认演示模式，不调用外部服务。
+- `ASR_PROVIDER=aliyun_qwen3_asr_flash`：调用阿里百炼 `qwen3-asr-flash`。
+- 本地视频会先由 ffmpeg 抽取为低码率 mp3，再作为 `data:audio/mpeg;base64,...` 发送给模型。
+- 单段视频时长需控制在 `ASR_MAX_DURATION_SEC=300` 秒以内。
+- Base64 后请求音频载荷需控制在 `ASR_MAX_PAYLOAD_BYTES=10485760` 以内。
+- qwen3-asr-flash 返回文本后，后端按文本长度和视频时长切成近似 `transcript_segments`，供候选切片链路继续使用。
+
 `POST /api/v1/video-ops/videos/{id}/detect-clips`
 
 创建候选切片任务。
@@ -602,8 +628,9 @@ FastAPI 创建 agent_tasks 记录
 
 ASR 不可用：
 
-- `TranscriptionService(mock=True)` 返回 demo transcript。
+- `.env` 设置 `ASR_PROVIDER=mock`，`TranscriptionService` 返回 demo transcript。
 - 仍能演示切片、文案和审核流程。
+- `ASR_PROVIDER=aliyun_qwen3_asr_flash` 但缺少 `ASR_API_KEY`、ffmpeg 不可用、视频超过 5 分钟或音频 Base64 后超过 10MB 时，转写任务会失败并写入结构化错误。
 
 LLM 不可用：
 
@@ -714,7 +741,7 @@ cd C:\Users\36183\Desktop\working\demo3\backend
 
 ## 14. 后续扩展
 
-- 接入真实 Whisper-compatible ASR。
+- 真实 DashScope API Key 联调 qwen3-asr-flash。
 - 对接 MinIO。
 - 自动截取封面帧。
 - 把人工确认切片写入项目四 AI 素材中心的预留接口。

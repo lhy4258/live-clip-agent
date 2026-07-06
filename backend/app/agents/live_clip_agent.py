@@ -67,7 +67,7 @@ class LiveClipAgent:
         video = self.db.get(SourceVideo, video_id)
         if video is None:
             raise ValueError(f"Video {video_id} not found")
-        segments = self.transcription_tool.run(video.file_uri)
+        segments = self.transcription_tool.run(video.file_uri, duration_sec=video.duration_sec)
         return self.save_transcript(video_id=video_id, segments=segments)
 
     def detect_clips(self, video_id: str, trace_id: str) -> int:
