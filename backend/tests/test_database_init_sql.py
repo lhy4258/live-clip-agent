@@ -22,6 +22,15 @@ class DatabaseInitSqlTest(unittest.TestCase):
         self.assertIn("CREATE INDEX IF NOT EXISTS ix_transcript_segments_video_time", sql)
         self.assertIn("error_json JSONB NOT NULL DEFAULT '{}'::jsonb", sql)
         self.assertIn("ALTER TABLE agent_tasks", sql)
+        self.assertIn("export_status TEXT NOT NULL DEFAULT 'not_started'", sql)
+        self.assertIn("is_editable BOOLEAN NOT NULL DEFAULT false", sql)
+        self.assertIn("edit_suggestion TEXT NOT NULL DEFAULT ''", sql)
+        self.assertIn("edit_reason TEXT NOT NULL DEFAULT ''", sql)
+        self.assertIn("WHERE status = 'needs_edit'", sql)
+        self.assertIn("clip_file_uri TEXT", sql)
+        self.assertIn("export_error TEXT", sql)
+        self.assertIn("exported_at TIMESTAMPTZ", sql)
+        self.assertIn("ALTER TABLE video_clips", sql)
         self.assertNotIn("__", sql)
 
     def test_split_sql_statements_returns_executable_statements(self):

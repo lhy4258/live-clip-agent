@@ -32,6 +32,7 @@ export interface TranscriptSegment {
 export interface VideoClip {
   id: string
   video_id: string
+  source_video_title: string
   start_sec: number
   end_sec: number
   title: string
@@ -40,7 +41,25 @@ export interface VideoClip {
   cover_text: string
   score: number
   status: string
+  is_editable: boolean
+  edit_suggestion: string
+  edit_reason: string
   risk_level: string
+  export_status: string
+  clip_file_uri: string | null
+  export_error: string | null
+  exported_at: string | null
+}
+
+export interface PublishPlan {
+  id: string
+  clip_id: string
+  platform: string
+  title: string
+  description: string
+  hashtags: string[]
+  status: string
+  created_at: string
 }
 
 export interface ChainRun {

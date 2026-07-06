@@ -1,9 +1,53 @@
 <script setup lang="ts">
+import { computed, onBeforeUnmount, watch } from 'vue'
 import { useVideoOpsContext } from '../composables/videoOpsContext'
 import type { AgentJob } from '../types'
-import { tagType } from '../utils/format'
+import { statusText, tagType } from '../utils/format'
 
-const { jobId, job, queryJob, retryCurrentJob, deleteCurrentJob } = useVideoOpsContext()
+const { jobId, job, refreshJob, queryJob, retryCurrentJob, deleteCurrentJob } = useVideoOpsContext()
+
+const activeJobStatuses = new Set(['pending', 'running'])
+const isAutoRefreshing = computed(() => Boolean(job.value && activeJobStatuses.has(job.value.status)))
+let refreshTimer: number | undefined
+let refreshInFlight = false
+
+function stopAutoRefresh() {
+  if (refreshTimer === undefined) return
+  window.clearInterval(refreshTimer)
+  refreshTimer = undefined
+}
+
+function startAutoRefresh() {
+  if (refreshTimer !== undefined) return
+  refreshTimer = window.setInterval(async () => {
+    if (!jobId.value || !job.value || !activeJobStatuses.has(job.value.status) || refreshInFlight) {
+      stopAutoRefresh()
+      return
+    }
+    refreshInFlight = true
+    try {
+      await refreshJob()
+    } catch {
+      stopAutoRefresh()
+    } finally {
+      refreshInFlight = false
+    }
+  }, 3000)
+}
+
+watch(
+  isAutoRefreshing,
+  (active) => {
+    if (active) {
+      startAutoRefresh()
+    } else {
+      stopAutoRefresh()
+    }
+  },
+  { immediate: true },
+)
+
+onBeforeUnmount(stopAutoRefresh)
 
 function errorText(row: AgentJob) {
   const message = row.error_json?.message
@@ -51,7 +95,7 @@ function formatErrorJson(row: AgentJob) {
           <el-descriptions-item label="任务">{{ job.id }}</el-descriptions-item>
           <el-descriptions-item label="类型">{{ job.task_type }}</el-descriptions-item>
           <el-descriptions-item label="状态">
-            <el-tag :type="tagType(job.status)" effect="light">{{ job.status }}</el-tag>
+            <el-tag :type="tagType(job.status)" effect="light">{{ statusText(job.status) }}</el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="Trace">{{ job.trace_id }}</el-descriptions-item>
           <el-descriptions-item label="失败原因" :span="2">{{ errorText(job) }}</el-descriptions-item>

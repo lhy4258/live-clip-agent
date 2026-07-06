@@ -8,7 +8,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.api.v1.jobs import delete_job, retry_job
 from app.core.database import Base
-from app.models.tables import AgentTask
+from app.models.tables import AgentTask, SourceVideo, VideoClip
 from app.services.tasks import mark_task_failed
 
 
@@ -56,6 +56,53 @@ class JobRetryAndDeleteTest(unittest.TestCase):
         self.assertIn("retry", result.output_json)
         self.assertEqual(result.output_json["retry"]["previous_error"]["message"], "boom")
         enqueue.assert_called_once_with("transcribe_video", task.id, "video-1", force_new_job=True)
+
+    def test_retry_failed_export_job_requeues_clip_export_and_marks_clip_pending(self):
+        video = SourceVideo(
+            id="video-1",
+            title="直播回放",
+            file_uri="data/files/source.mp4",
+            source="self_recorded",
+            license="self_owned",
+        )
+        clip = VideoClip(
+            id="clip-1",
+            video_id=video.id,
+            start_sec=10,
+            end_sec=42,
+            title="直播切片方法",
+            summary="讲解如何定位直播切片。",
+            tags=["直播切片"],
+            cover_text="先找问题",
+            score=0.88,
+            status="approved",
+            risk_level="low",
+            export_status="failed",
+            export_error="ffmpeg failed",
+        )
+        task = AgentTask(
+            id="task-export",
+            task_type="export_clip_video",
+            status="failed",
+            input_json={"clip_id": "clip-1"},
+            output_json={},
+            error="ffmpeg failed",
+            error_json={"message": "ffmpeg failed", "error_type": "RuntimeError"},
+            trace_id="trace-export",
+        )
+        self.db.add(video)
+        self.db.add(clip)
+        self.db.add(task)
+        self.db.commit()
+
+        with patch("app.api.v1.jobs.enqueue_clip_export_task", return_value=True) as enqueue:
+            result = retry_job(task.id, self.db, None)
+
+        self.assertEqual(result.status, "pending")
+        enqueue.assert_called_once_with(task.id, "clip-1", force_new_job=True)
+        refreshed_clip = self.db.get(VideoClip, "clip-1")
+        self.assertEqual(refreshed_clip.export_status, "pending")
+        self.assertIsNone(refreshed_clip.export_error)
 
     def test_retry_rejects_non_failed_job(self):
         task = self.add_task(status="running")

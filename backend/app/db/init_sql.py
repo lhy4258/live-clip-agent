@@ -51,9 +51,51 @@ CREATE TABLE IF NOT EXISTS video_clips (
   cover_text TEXT NOT NULL DEFAULT '',
   score DOUBLE PRECISION NOT NULL,
   status TEXT NOT NULL DEFAULT 'candidate',
+  is_editable BOOLEAN NOT NULL DEFAULT false,
+  edit_suggestion TEXT NOT NULL DEFAULT '',
+  edit_reason TEXT NOT NULL DEFAULT '',
   risk_level TEXT NOT NULL DEFAULT 'unknown',
+  export_status TEXT NOT NULL DEFAULT 'not_started',
+  clip_file_uri TEXT,
+  export_error TEXT,
+  exported_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+ALTER TABLE video_clips
+  ADD COLUMN IF NOT EXISTS export_status TEXT NOT NULL DEFAULT 'not_started';
+
+ALTER TABLE video_clips
+  ADD COLUMN IF NOT EXISTS is_editable BOOLEAN NOT NULL DEFAULT false;
+
+ALTER TABLE video_clips
+  ADD COLUMN IF NOT EXISTS edit_suggestion TEXT NOT NULL DEFAULT '';
+
+ALTER TABLE video_clips
+  ADD COLUMN IF NOT EXISTS edit_reason TEXT NOT NULL DEFAULT '';
+
+ALTER TABLE video_clips
+  ADD COLUMN IF NOT EXISTS clip_file_uri TEXT;
+
+ALTER TABLE video_clips
+  ADD COLUMN IF NOT EXISTS export_error TEXT;
+
+ALTER TABLE video_clips
+  ADD COLUMN IF NOT EXISTS exported_at TIMESTAMPTZ;
+
+UPDATE video_clips
+SET
+  status = 'candidate',
+  is_editable = true,
+  edit_suggestion = CASE
+    WHEN edit_suggestion = '' THEN '建议优化标题、封面文案或片段说明后再确认。'
+    ELSE edit_suggestion
+  END,
+  edit_reason = CASE
+    WHEN edit_reason = '' THEN '该片段来自旧版中间状态，保留为可修改参考项，不影响确认或拒绝流程。'
+    ELSE edit_reason
+  END
+WHERE status = 'needs_edit';
 
 CREATE TABLE IF NOT EXISTS clip_reviews (
   id TEXT PRIMARY KEY,

@@ -2,7 +2,7 @@
 
 ## 1. 项目目标
 
-直播切片 Agent 用于把直播录制或长视频转成可运营的短视频素材。系统完成视频入库、音频转写、候选切片识别、运营文案生成、人工审核和发布清单导出。
+直播切片 Agent 用于把直播录制或长视频转成可运营的短视频素材。系统完成视频入库、音频转写、候选切片识别、运营文案生成、人工审核、短视频文件导出和发布清单导出。
 
 面试讲法重点：
 
@@ -84,6 +84,8 @@ flowchart LR
   LC --> DB
   Tools --> DB
   API --> Export["CSV/JSON 导出"]
+  RQ --> FFmpeg["ffmpeg 视频切片导出"]
+  FFmpeg --> Storage["data/files/clips"]
 ```
 
 核心流程：
@@ -96,8 +98,9 @@ flowchart LR
 6. `LiveClipAgent` 继续调用评分、运营文案和风险审核 Chain Tool。
 7. `save_clip_tool` 保存候选切片记录。
 8. 人工审核确认或拒绝切片。
-9. 确认后的切片生成 `publish_plans`。
-10. 前端导出 CSV 或 JSON 发布清单。
+9. 确认后的切片可创建异步导出任务，由 RQ worker 调用 ffmpeg 切出短视频文件。
+10. 确认后的切片生成 `publish_plans`。
+11. 前端导出 CSV 或 JSON 发布清单。
 
 ## 5. LangChain 使用边界
 
@@ -116,6 +119,7 @@ flowchart LR
 - 任务重试。
 - 文件路径判断。
 - CSV/JSON 导出。
+- ffmpeg 视频切片导出。
 - Agent 固定流程编排、工具调用顺序、任务状态回写。
 - 候选片段时间边界校验、去重和数据库保存。
 
@@ -161,6 +165,7 @@ backend/
       agent_pipeline.py
       clip_detection.py
       exporter.py
+      queue.py
       risk_rules.py
       storage.py
       tasks.py
@@ -172,6 +177,7 @@ backend/
       publish_copy_tool.py
       risk_review_tool.py
       save_clip_tool.py
+      export_clip_video_tool.py
     main.py
 ```
 
@@ -265,6 +271,10 @@ DBX 的角色：
 - `score`
 - `status`
 - `risk_level`
+- `export_status`
+- `clip_file_uri`
+- `export_error`
+- `exported_at`
 
 ### clip_reviews
 
@@ -441,6 +451,24 @@ DBX 的角色：
 }
 ```
 
+`POST /api/v1/video-ops/clips/{id}/export`
+
+人工审核通过后创建异步视频导出任务。接口返回 `agent_tasks` 任务记录，真正的 ffmpeg 导出由 RQ worker 执行。
+
+限制：
+
+- 只有 `status=approved` 的切片可以导出。
+- 同一个切片在 `export_status=pending/exporting` 时不能重复入队。
+- 失败后 `export_status=failed`，可以再次手动发起导出。
+
+导出状态：
+
+- `not_started`：未导出。
+- `pending`：已进入队列。
+- `exporting`：worker 正在导出。
+- `exported`：已生成短视频文件，路径写入 `clip_file_uri`。
+- `failed`：导出失败，原因写入 `export_error`，结构化失败原因写入对应任务的 `error_json`。
+
 ### 导出
 
 `GET /api/v1/video-ops/publish-plans/export?format=csv`
@@ -489,7 +517,7 @@ frontend/
 工作区：
 
 - `/videos`：登记视频路径或上传本地视频，查看处理状态，启动转写和候选切片任务。
-- `/clips`：查看候选切片，确认、拒绝、生成发布计划。
+- `/clips`：查看候选切片，确认、拒绝、异步生成视频切片、生成发布计划。
 - `/publish`：导出 CSV/JSON。
 - `/jobs`：查询任务状态、错误、trace_id，支持失败任务手动重新入队和删除。
 - `/chains`：查看 LangChain 调用记录。
@@ -515,6 +543,7 @@ frontend/
 
 - `transcribe_video`
 - `detect_clips`
+- `export_clip_video`
 
 任务状态：
 
@@ -551,10 +580,22 @@ python scripts/run_worker.py
 
 ```text
 FastAPI 创建 agent_tasks 记录
--> enqueue_video_task() 把任务放入 Redis/RQ 的 video_ops 队列
+-> enqueue_video_task()/enqueue_clip_export_task() 把任务放入 Redis/RQ 的 video_ops 队列
 -> scripts/run_worker.py 启动 SimpleWorker
 -> worker 执行 backend/app/jobs/pipeline.py
 -> mark_task_running()/mark_task_succeeded()/mark_task_failed() 回写任务状态和结构化失败原因
+```
+
+视频切片导出链路：
+
+```text
+前端在已确认切片上点击“生成视频切片”
+-> POST /api/v1/video-ops/clips/{clip_id}/export
+-> 创建 export_clip_video 任务，切片 export_status=pending
+-> RQ worker 执行 export_clip_video_job()
+-> ExportClipVideoTool 调用 ffmpeg
+-> 成功：video_clips.export_status=exported，clip_file_uri 写入输出 mp4 路径
+-> 失败：video_clips.export_status=failed，export_error 和 agent_tasks.error_json 写入失败原因
 ```
 
 ## 11. 降级策略
@@ -572,8 +613,9 @@ LLM 不可用：
 
 ffmpeg 不可用：
 
-- 保留基于已存在 transcript 的切片模式。
-- 可以先导入 transcript segments，再运行切片检测。
+- 转写阶段如果依赖真实音频提取，会失败并写入任务错误。
+- 已存在 transcript 的候选切片、审核、发布计划流程仍可演示。
+- 视频切片导出任务会失败，失败原因写入 `agent_tasks.error_json` 和 `video_clips.export_error`，可在安装 ffmpeg 后手动重新导出。
 
 切片质量差：
 
@@ -599,9 +641,8 @@ CREATE DATABASE "live-stream-clip-agent";
 
 ```powershell
 cd C:\Users\36183\Desktop\working\demo3\backend
-D:\uv\uv.exe pip install -r requirements.txt
 .\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
-```
+``
 
 后端启动必须使用本项目 `backend\.venv` 内的 Python，不使用系统全局 Python。
 
@@ -657,9 +698,10 @@ cd C:\Users\36183\Desktop\working\demo3\backend
 5. 每个视频执行候选切片生成。
 6. 每个视频至少生成 5 个候选切片。
 7. 人工确认切片。
-8. 生成发布计划。
-9. 导出 CSV 和 JSON。
-10. 在 `Chain Runs` 工作区查看 LangChain 调用记录。
+8. 点击“生成视频切片”，等待导出任务完成。
+9. 生成发布计划。
+10. 导出 CSV 和 JSON。
+11. 在 `Chain Runs` 工作区查看 LangChain 调用记录。
 
 浏览器验收：
 
@@ -675,6 +717,5 @@ cd C:\Users\36183\Desktop\working\demo3\backend
 - 接入真实 Whisper-compatible ASR。
 - 对接 MinIO。
 - 自动截取封面帧。
-- 简单裁剪导出。
 - 把人工确认切片写入项目四 AI 素材中心的预留接口。
 - 把调用记录接入 LangSmith。

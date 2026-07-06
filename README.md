@@ -1,6 +1,6 @@
 # Live Stream Clip Agent
 
-直播切片 Agent 工程版项目。系统把直播录制或长视频转成可审核、可导出的短视频运营资产，覆盖视频入库、ASR 转写、候选切片识别、LangChain 结构化文案生成、人工审核和发布清单导出。
+直播切片 Agent 工程版项目。系统把直播录制或长视频转成可审核、可导出的短视频运营资产，覆盖视频入库、ASR 转写、候选切片识别、LangChain 结构化文案生成、人工审核、短视频文件异步导出和发布清单导出。
 
 ## 技术栈
 
@@ -79,6 +79,13 @@ cd backend
 ```powershell
 cd frontend
 pnpm dev
+```
+
+填充演示数据：
+
+```powershell
+cd backend
+.\.venv\Scripts\python.exe scripts/seed_demo_data.py
 ```
 
 ## 文档

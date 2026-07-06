@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
-from sqlalchemy import select
+from fastapi import APIRouter, File, Form, HTTPException, Response, UploadFile, status
+from sqlalchemy import delete, select
 
 from app.api.deps import ApiKey, DbSession
 from app.core.config import get_settings
-from app.models.tables import SourceVideo
+from app.models.tables import ClipReview, PublishPlan, SourceVideo, TranscriptSegmentModel, VideoClip
 from app.schemas.video_ops import JobRead, TranscriptSegmentRead, VideoCreate, VideoRead
 from app.services.queue import enqueue_video_task
 from app.services.storage import VideoStorageService
@@ -62,6 +62,23 @@ def get_video(video_id: str, db: DbSession, _: ApiKey) -> SourceVideo:
     if video is None:
         raise HTTPException(status_code=404, detail="Video not found")
     return video
+
+
+@router.delete("/{video_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_video(video_id: str, db: DbSession, _: ApiKey) -> Response:
+    video = db.get(SourceVideo, video_id)
+    if video is None:
+        raise HTTPException(status_code=404, detail="Video not found")
+
+    clip_ids = list(db.scalars(select(VideoClip.id).where(VideoClip.video_id == video_id)).all())
+    if clip_ids:
+        db.execute(delete(ClipReview).where(ClipReview.clip_id.in_(clip_ids)))
+        db.execute(delete(PublishPlan).where(PublishPlan.clip_id.in_(clip_ids)))
+    db.execute(delete(VideoClip).where(VideoClip.video_id == video_id))
+    db.execute(delete(TranscriptSegmentModel).where(TranscriptSegmentModel.video_id == video_id))
+    db.delete(video)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/{video_id}/transcripts", response_model=list[TranscriptSegmentRead])

@@ -3,22 +3,27 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   createPublishPlan,
   createVideo,
+  deleteClip,
+  deleteVideo,
   deleteJob,
+  exportClip,
   exportPublishPlansUrl,
   getClip,
   getJob,
   getVideo,
   listChainRuns,
   listClips,
+  listPublishPlans,
   listTranscripts,
   listVideos,
   reviewClip,
   retryJob,
   startDetectClips,
   startTranscribe,
+  updateClipCoverText,
   uploadVideo,
 } from '../api'
-import type { AgentJob, ChainRun, SourceVideo, TranscriptSegment, VideoClip } from '../types'
+import type { AgentJob, ChainRun, PublishPlan, SourceVideo, TranscriptSegment, VideoClip } from '../types'
 
 export type TabKey = 'videos' | 'clips' | 'publish' | 'jobs' | 'chains'
 
@@ -33,6 +38,8 @@ export function useVideoOps() {
   const transcripts = ref<TranscriptSegment[]>([])
   const clips = ref<VideoClip[]>([])
   const selectedClip = ref<VideoClip | null>(null)
+  const coverTextDraft = ref('')
+  const publishPlans = ref<PublishPlan[]>([])
   const clipStatus = ref('')
   const jobId = ref('')
   const job = ref<AgentJob | null>(null)
@@ -59,12 +66,18 @@ export function useVideoOps() {
     statusMessage.value = 'API Key 已保存'
   }
 
-  async function run(task: () => Promise<void>, message = '操作完成') {
+  function setSelectedClip(clip: VideoClip | null) {
+    selectedClip.value = clip
+    coverTextDraft.value = clip?.cover_text || ''
+  }
+
+  async function run(task: () => Promise<void>, message = '操作完成', notify = false) {
     busy.value = true
     statusMessage.value = '处理中...'
     try {
       await task()
       statusMessage.value = message
+      if (notify) ElMessage.success(message)
     } catch (error) {
       const text = error instanceof Error ? error.message : '操作失败'
       statusMessage.value = text
@@ -113,22 +126,50 @@ export function useVideoOps() {
     transcripts.value = await listTranscripts(video.id)
   }
 
-  async function runTranscribe() {
-    if (!selectedVideo.value) return
+  async function runTranscribe(video: SourceVideo | null = selectedVideo.value) {
+    if (!video) return
     await run(async () => {
-      const created = await startTranscribe(selectedVideo.value!.id)
+      const created = await startTranscribe(video.id)
       jobId.value = created.id
       job.value = created
-    }, '转写任务已创建')
+      await loadVideos()
+    }, `“${video.title}”转写任务已创建`)
   }
 
-  async function runDetect() {
-    if (!selectedVideo.value) return
+  async function runDetect(video: SourceVideo | null = selectedVideo.value) {
+    if (!video) return
     await run(async () => {
-      const created = await startDetectClips(selectedVideo.value!.id)
+      const created = await startDetectClips(video.id)
       jobId.value = created.id
       job.value = created
-    }, '切片任务已创建')
+      await loadVideos()
+    }, `“${video.title}”候选切片任务已创建`)
+  }
+
+  async function deleteVideoRow(video: SourceVideo) {
+    try {
+      await ElMessageBox.confirm(
+        `确认删除视频“${video.title}”吗？删除后会同步移除它的转写、候选切片和发布计划。`,
+        '删除登记视频',
+        {
+          type: 'warning',
+          confirmButtonText: '删除',
+          cancelButtonText: '取消',
+        },
+      )
+    } catch {
+      return
+    }
+    await run(async () => {
+      await deleteVideo(video.id)
+      if (selectedVideo.value?.id === video.id) {
+        selectedVideo.value = null
+        transcripts.value = []
+      }
+      await loadVideos()
+      await loadClips()
+      await loadPublishPlans()
+    }, '视频已删除', true)
   }
 
   function seek(seconds: number) {
@@ -138,12 +179,34 @@ export function useVideoOps() {
   }
 
   async function loadClips() {
+    const currentId = selectedClip.value?.id
     clips.value = await listClips(clipStatus.value || undefined)
-    if (!selectedClip.value && clips.value.length) selectedClip.value = clips.value[0]
+    if (currentId) {
+      setSelectedClip(clips.value.find((clip) => clip.id === currentId) || clips.value[0] || null)
+    } else if (clips.value.length) {
+      setSelectedClip(clips.value[0])
+    }
   }
 
   async function openClip(row: VideoClip) {
-    selectedClip.value = await getClip(row.id)
+    setSelectedClip(await getClip(row.id))
+  }
+
+  async function deleteClipRow(clip: VideoClip) {
+    try {
+      await ElMessageBox.confirm(`确认删除切片“${clip.title}”吗？删除后不会再进入发布清单。`, '删除切片', {
+        type: 'warning',
+        confirmButtonText: '删除',
+        cancelButtonText: '取消',
+      })
+    } catch {
+      return
+    }
+    await run(async () => {
+      await deleteClip(clip.id)
+      await loadClips()
+      await loadPublishPlans()
+    }, '切片已删除', true)
   }
 
   async function submitReview(label: 'approved' | 'rejected') {
@@ -152,30 +215,65 @@ export function useVideoOps() {
       inputValue: label === 'approved' ? '内容可用' : '不适合发布',
     })
     await run(async () => {
-      selectedClip.value = await reviewClip(selectedClip.value!.id, {
+      setSelectedClip(await reviewClip(selectedClip.value!.id, {
         label,
         reason: result.value,
         reviewer: 'operator',
-      })
+      }))
       await loadClips()
-    }, '审核已保存')
+    }, '审核已保存', true)
   }
 
   async function submitPublishPlan() {
     if (!selectedClip.value) return
+    if (selectedClip.value.status !== 'approved') {
+      ElMessage.warning('请先确认切片，再生成发布计划')
+      return
+    }
     await run(async () => {
       await createPublishPlan(selectedClip.value!.id, 'douyin')
-    }, '发布计划已生成')
+      await loadPublishPlans()
+    }, '发布计划已生成，可到发布清单查看', true)
+  }
+
+  async function saveCoverText() {
+    if (!selectedClip.value) return
+    const clipId = selectedClip.value.id
+    await run(async () => {
+      setSelectedClip(await updateClipCoverText(clipId, coverTextDraft.value.trim()))
+      await loadClips()
+    }, '封面文案已保存', true)
+  }
+
+  async function submitExportClip() {
+    if (!selectedClip.value) return
+    const clipId = selectedClip.value.id
+    await run(async () => {
+      const created = await exportClip(clipId)
+      jobId.value = created.id
+      job.value = created
+      setSelectedClip(await getClip(clipId))
+      await loadClips()
+    }, '视频切片导出任务已创建', true)
   }
 
   function download(format: 'csv' | 'json') {
     window.open(exportPublishPlansUrl(format), '_blank')
   }
 
+  async function loadPublishPlans() {
+    publishPlans.value = await listPublishPlans()
+  }
+
+  async function refreshJob() {
+    if (!jobId.value) return
+    job.value = await getJob(jobId.value)
+  }
+
   async function queryJob() {
     if (!jobId.value) return
     await run(async () => {
-      job.value = await getJob(jobId.value)
+      await refreshJob()
     }, '任务已查询')
   }
 
@@ -211,6 +309,7 @@ export function useVideoOps() {
     activeTab.value = tab
     if (tab === 'videos') await run(loadVideos, '视频列表已刷新')
     if (tab === 'clips') await run(loadClips, '切片列表已刷新')
+    if (tab === 'publish') await run(loadPublishPlans, '发布清单已刷新')
     if (tab === 'chains') await run(loadChains, 'Chain Runs 已刷新')
   }
 
@@ -229,6 +328,8 @@ export function useVideoOps() {
     transcripts,
     clips,
     selectedClip,
+    coverTextDraft,
+    publishPlans,
     clipStatus,
     jobId,
     job,
@@ -245,12 +346,18 @@ export function useVideoOps() {
     openVideo,
     runTranscribe,
     runDetect,
+    deleteVideoRow,
     seek,
     loadClips,
     openClip,
+    deleteClipRow,
     submitReview,
     submitPublishPlan,
+    saveCoverText,
+    submitExportClip,
     download,
+    loadPublishPlans,
+    refreshJob,
     queryJob,
     retryCurrentJob,
     deleteCurrentJob,

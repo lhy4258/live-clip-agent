@@ -5,9 +5,15 @@ from sqlalchemy import select
 
 from app.api.deps import ApiKey, DbSession
 from app.models.tables import PublishPlan, VideoClip
+from app.schemas.video_ops import PublishPlanRead
 from app.services.exporter import PublishPlanExportRow, export_publish_plans_csv, export_publish_plans_json
 
 router = APIRouter(prefix="/video-ops/publish-plans", tags=["publish-plans"])
+
+
+@router.get("", response_model=list[PublishPlanRead])
+def list_publish_plans(db: DbSession, _: ApiKey) -> list[PublishPlan]:
+    return list(db.scalars(select(PublishPlan).order_by(PublishPlan.created_at.desc())).all())
 
 
 @router.get("/export")

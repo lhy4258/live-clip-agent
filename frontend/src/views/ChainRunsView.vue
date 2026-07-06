@@ -22,13 +22,13 @@ const { traceId, chainRuns, loadChains } = useVideoOpsContext()
     </div>
 
     <el-card shadow="never" class="work-card">
-      <el-table :data="chainRuns" row-key="id" height="520">
-        <el-table-column prop="chain_name" label="Chain" width="150" />
-        <el-table-column prop="prompt_version" label="Prompt" width="150" />
-        <el-table-column prop="model" label="模型" width="130" />
-        <el-table-column prop="latency_ms" label="耗时" width="100" />
-        <el-table-column prop="trace_id" label="Trace" min-width="220" show-overflow-tooltip />
-        <el-table-column prop="error" label="错误" min-width="180" show-overflow-tooltip />
+      <el-table :data="chainRuns" row-key="id" height="520" class="wrap-table">
+        <el-table-column prop="chain_name" label="Chain" width="130" />
+        <el-table-column prop="prompt_version" label="Prompt" width="130" />
+        <el-table-column prop="model" label="模型" width="120" />
+        <el-table-column prop="latency_ms" label="耗时" width="80" />
+        <el-table-column prop="trace_id" label="Trace" min-width="180" />
+        <el-table-column prop="error" label="错误" min-width="160" />
       </el-table>
     </el-card>
   </section>

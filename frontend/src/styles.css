@@ -201,6 +201,68 @@ textarea {
   padding: 16px;
 }
 
+.equal-height-row {
+  align-items: stretch;
+}
+
+.equal-height-row > .el-col {
+  display: flex;
+}
+
+.equal-height-row .work-card {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  width: 100%;
+}
+
+.equal-height-row .work-card .el-card__body {
+  flex: 1 1 auto;
+}
+
+.media-detail-row .timeline-card .el-card__body {
+  display: flex;
+  min-height: 0;
+}
+
+.timeline-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+}
+
+.timeline-scroll .el-scrollbar__view {
+  min-height: 100%;
+}
+
+.plain-table-section {
+  min-width: 0;
+}
+
+.plain-table-toolbar {
+  align-items: center;
+  background: #fff;
+  border: 1px solid #dcdfe6;
+  border-bottom: 0;
+  border-radius: 6px 6px 0 0;
+  display: flex;
+  justify-content: space-between;
+  min-height: 52px;
+  padding: 10px 16px;
+}
+
+.direct-table {
+  border: 1px solid #dcdfe6;
+  border-radius: 0 0 6px 6px;
+}
+
+.plain-empty {
+  background: #fff;
+  border: 1px solid #dcdfe6;
+  border-radius: 0 0 6px 6px;
+  min-height: calc(100vh - 240px);
+}
+
 .muted {
   color: #6b7280;
 }
@@ -271,6 +333,29 @@ textarea {
   padding: 10px;
 }
 
+.cover-editor {
+  margin: 12px 0;
+}
+
+.field-caption {
+  color: #606266;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.cover-edit-row {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+}
+
+.cover-edit-row .el-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 .form-actions {
   display: flex;
   gap: 8px;
@@ -317,10 +402,63 @@ textarea {
 }
 
 .tag-row {
+  align-items: center;
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   margin: 12px 0;
+}
+
+.tag-label {
+  color: #606266;
+  font-size: 13px;
+  font-weight: 600;
+  margin-right: 2px;
+}
+
+.tag-row .el-tag {
+  transition: none !important;
+}
+
+.table-actions {
+  align-items: center;
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  white-space: normal;
+}
+
+.table-actions .el-button {
+  margin-left: 0 !important;
+}
+
+.wrap-table .cell {
+  line-height: 1.45;
+  overflow: visible;
+  padding: 8px 10px;
+  text-overflow: clip;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.wrap-table .el-table__cell {
+  vertical-align: middle;
+}
+
+.wrap-table .el-table__body-wrapper,
+.wrap-table .el-scrollbar__wrap {
+  overflow-x: hidden !important;
+}
+
+.wrap-table .el-scrollbar__bar.is-horizontal {
+  display: none;
+}
+
+.compact-tags {
+  gap: 4px;
+  justify-content: center;
+  margin: 0;
 }
 
 .json-block {

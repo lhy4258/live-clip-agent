@@ -1,4 +1,4 @@
-import type { AgentJob, ChainRun, SourceVideo, TranscriptSegment, VideoClip } from './types'
+import type { AgentJob, ChainRun, PublishPlan, SourceVideo, TranscriptSegment, VideoClip } from './types'
 
 const base = '/api/v1/video-ops'
 
@@ -55,6 +55,10 @@ export function getVideo(videoId: string) {
   return request<SourceVideo>(`/videos/${videoId}`)
 }
 
+export function deleteVideo(videoId: string) {
+  return request<void>(`/videos/${videoId}`, { method: 'DELETE' })
+}
+
 export function listTranscripts(videoId: string) {
   return request<TranscriptSegment[]>(`/videos/${videoId}/transcripts`)
 }
@@ -88,12 +92,31 @@ export function getClip(clipId: string) {
   return request<VideoClip>(`/clips/${clipId}`)
 }
 
+export function deleteClip(clipId: string) {
+  return request<void>(`/clips/${clipId}`, { method: 'DELETE' })
+}
+
 export function reviewClip(clipId: string, payload: { label: string; reason: string; reviewer: string }) {
   return request<VideoClip>(`/clips/${clipId}/review`, { method: 'POST', body: JSON.stringify(payload) })
 }
 
+export function updateClipCoverText(clipId: string, coverText: string) {
+  return request<VideoClip>(`/clips/${clipId}/cover-text`, {
+    method: 'PATCH',
+    body: JSON.stringify({ cover_text: coverText }),
+  })
+}
+
+export function exportClip(clipId: string) {
+  return request<AgentJob>(`/clips/${clipId}/export`, { method: 'POST' })
+}
+
 export function createPublishPlan(clipId: string, platform: string) {
-  return request(`/clips/${clipId}/publish-plan`, { method: 'POST', body: JSON.stringify({ platform }) })
+  return request<PublishPlan>(`/clips/${clipId}/publish-plan`, { method: 'POST', body: JSON.stringify({ platform }) })
+}
+
+export function listPublishPlans() {
+  return request<PublishPlan[]>('/publish-plans')
 }
 
 export function exportPublishPlansUrl(format: 'csv' | 'json') {
