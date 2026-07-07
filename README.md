@@ -9,29 +9,10 @@
 - 数据库：本地 Docker PostgreSQL，数据库名 `live-stream-clip-agent`。
 - 队列：Redis + RQ，默认队列名 `video_ops`。
 - ASR：默认 mock，可切换为阿里百炼 `qwen3-asr-flash`。
+- ffmpeg：默认为空，需本地进行配置
 - 存储：本地文件存储 `backend/data/files`，预留 MinIO 扩展。
 
-## 推送远端前检查
 
-建议推送：
-
-- `backend/app/`、`backend/scripts/`、`backend/tests/`
-- `frontend/src/`、`frontend/package.json`、`frontend/pnpm-lock.yaml`、`frontend/vite.config.ts`
-- `docs/`
-- `README.md`
-- `.gitignore`
-- `backend/.env.example`
-- `backend/requirements.txt`
-- `backend/pyproject.toml`
-
-不要推送：
-
-- `backend/.env`：本机真实配置和密钥。
-- `backend/.venv/`：后端虚拟环境。
-- `frontend/node_modules/`、`.pnpm-store/`、`frontend/dist/`：前端依赖和构建产物。
-- `backend/data/files/`：上传视频、转写音频、导出切片等运行产物。
-- `tools/ffmpeg/`：本机 ffmpeg 工具，不同机器路径不同，按下文自行配置。
-- `.idea/`、`.pytest_cache/`、`.ruff_cache/`、`__pycache__/`：IDE 和缓存文件。
 
 ## 环境配置
 
