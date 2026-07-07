@@ -2,6 +2,17 @@
 
 直播切片 Agent 工程版项目。系统把直播录制或本地长视频转成可审核、可导出的短视频运营资产，覆盖视频入库、ASR 转写、候选切片识别、LangChain 文案生成、人工审核、ffmpeg 异步导出和发布清单导出。
 
+## 效果展示
+
+<img width="1279" height="708" alt="image" src="https://github.com/user-attachments/assets/0072094e-dec3-4ef7-82f8-f45a3daa3eef" />
+视频库
+<img width="1271" height="703" alt="image" src="https://github.com/user-attachments/assets/e0b435a6-5947-4dd0-a3e2-8b077c752b7b" />
+切片审核
+<img width="1279" height="704" alt="image" src="https://github.com/user-attachments/assets/db425fad-040b-4fe9-a129-b1b584409fc5" />
+任务监控
+<img width="1277" height="702" alt="image" src="https://github.com/user-attachments/assets/1e2b8ec4-b4f1-40de-9202-f22cae64651f" />
+发布清单
+
 ## 技术栈
 
 - 后端：FastAPI、SQLAlchemy、PostgreSQL、Redis/RQ、LangChain、ffmpeg-python。
