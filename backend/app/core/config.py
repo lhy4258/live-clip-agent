@@ -28,6 +28,8 @@ class Settings(BaseSettings):
     asr_max_payload_bytes: int
     asr_segment_duration_sec: int
     asr_request_timeout_sec: int
+    ffmpeg_path: str | None
+    ffprobe_path: str | None
 
     @property
     def cors_origins(self) -> list[str]:

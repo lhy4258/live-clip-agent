@@ -51,6 +51,8 @@ class TranscriptionServiceTest(unittest.TestCase):
             "asr_max_payload_bytes": 10 * 1024 * 1024,
             "asr_segment_duration_sec": 30,
             "asr_request_timeout_sec": 60,
+            "ffmpeg_path": None,
+            "ffprobe_path": None,
             "storage_dir": "data/files",
         }
         values.update(overrides)

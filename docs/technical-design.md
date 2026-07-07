@@ -78,6 +78,8 @@ ASR_MAX_DURATION_SEC=300
 ASR_MAX_PAYLOAD_BYTES=10485760
 ASR_SEGMENT_DURATION_SEC=30
 ASR_REQUEST_TIMEOUT_SEC=60
+FFMPEG_PATH=C:\Users\36183\Desktop\working\demo3\tools\ffmpeg\bin\ffmpeg.exe
+FFPROBE_PATH=C:\Users\36183\Desktop\working\demo3\tools\ffmpeg\bin\ffprobe.exe
 FRONTEND_ORIGIN=http://localhost:5173
 FRONTEND_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
 ```
@@ -425,6 +427,7 @@ DBX 的角色：
 - `ASR_PROVIDER=mock`：默认演示模式，不调用外部服务。
 - `ASR_PROVIDER=aliyun_qwen3_asr_flash`：调用阿里百炼 `qwen3-asr-flash`。
 - 本地视频会先由 ffmpeg 抽取为低码率 mp3，再作为 `data:audio/mpeg;base64,...` 发送给模型。
+- 不要求把 ffmpeg 加入 Windows 系统环境变量；本项目通过 `FFMPEG_PATH` 和 `FFPROBE_PATH` 指向 `tools/ffmpeg/bin` 下的可执行文件。
 - 单段视频时长需控制在 `ASR_MAX_DURATION_SEC=300` 秒以内。
 - Base64 后请求音频载荷需控制在 `ASR_MAX_PAYLOAD_BYTES=10485760` 以内。
 - qwen3-asr-flash 返回文本后，后端按文本长度和视频时长切成近似 `transcript_segments`，供候选切片链路继续使用。
@@ -640,6 +643,7 @@ LLM 不可用：
 
 ffmpeg 不可用：
 
+- 检查 `.env` 中的 `FFMPEG_PATH` 和 `FFPROBE_PATH` 是否指向真实存在的 `ffmpeg.exe`、`ffprobe.exe`。
 - 转写阶段如果依赖真实音频提取，会失败并写入任务错误。
 - 已存在 transcript 的候选切片、审核、发布计划流程仍可演示。
 - 视频切片导出任务会失败，失败原因写入 `agent_tasks.error_json` 和 `video_clips.export_error`，可在安装 ffmpeg 后手动重新导出。

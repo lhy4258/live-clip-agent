@@ -10,6 +10,7 @@ from uuid import uuid4
 
 from app.core.config import Settings, get_settings
 from app.services.clip_detection import TranscriptSegment
+from app.services.ffmpeg_runtime import configure_ffmpeg_runtime
 
 
 VIDEO_SUFFIXES = {".mp4", ".mov", ".mkv", ".avi", ".webm", ".flv", ".m4v"}
@@ -102,6 +103,7 @@ class TranscriptionService:
 
         import ffmpeg
 
+        configure_ffmpeg_runtime(self.settings)
         (
             ffmpeg.input(str(source_path))
             .output(str(output_path), vn=None, acodec="libmp3lame", ac=1, audio_bitrate="32k")
@@ -128,6 +130,7 @@ class TranscriptionService:
         try:
             import ffmpeg
 
+            configure_ffmpeg_runtime(self.settings)
             duration = ffmpeg.probe(str(path)).get("format", {}).get("duration")
             return float(duration) if duration is not None else None
         except Exception:

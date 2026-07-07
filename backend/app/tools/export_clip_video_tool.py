@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from app.services.ffmpeg_runtime import configure_ffmpeg_runtime
+
 
 class ExportClipVideoTool:
     def __init__(self, output_dir: str | Path) -> None:
@@ -25,6 +27,7 @@ class ExportClipVideoTool:
         try:
             import ffmpeg
 
+            configure_ffmpeg_runtime()
             (
                 ffmpeg.input(str(source_path), ss=start_sec)
                 .output(
