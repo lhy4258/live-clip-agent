@@ -18,6 +18,8 @@
 - `backend/app/services/transcription.py` 已支持 `mock` 和 `aliyun_qwen3_asr_flash`。
 - `aliyun_qwen3_asr_flash` 会将本地视频用 ffmpeg 抽成 mp3，再以 Base64 Data URL 调用 qwen3-asr-flash。
 - qwen3-asr-flash 限制单段音频不超过 5 分钟，后续上传或转写前需要保证视频时长不超过 5 分钟。
+- ffmpeg 已放入 `tools/ffmpeg`，后端通过 `.env` 中的 `FFMPEG_PATH`、`FFPROBE_PATH` 使用项目内工具，不需要配置系统环境变量。
+- 已用项目内 ffmpeg 真实验证过短视频切片导出和视频抽 mp3 音频。
 - ffmpeg 已用于人工审核后的短视频切片导出。
 - 还没有使用真实 DashScope API Key 和真实视频完成联调验收。
 
@@ -27,13 +29,14 @@
 - `backend/app/jobs/pipeline.py`
 - `backend/app/core/config.py`
 - `backend/.env.example`
+- `backend/app/services/ffmpeg_runtime.py`
 - `docs/technical-design.md`
 
 完成标准：
 
 - 配置 `ASR_PROVIDER=aliyun_qwen3_asr_flash` 和真实 `ASR_API_KEY` 后，能调用 qwen3-asr-flash。
-- 本地上传视频能先抽取音频，再完成转写。
-- ASR 返回文本能写入 `transcript_segments`，时间段按视频总时长近似分配。
+- 5 分钟以内的本地上传视频能完成真实模型转写。
+- qwen3-asr-flash 返回文本能写入 `transcript_segments`，时间段按视频总时长近似分配。
 - mock 模式仍然保留，便于没有 ASR 环境时演示。
 
 验证方式：
