@@ -4,9 +4,16 @@ __pycache__/
 .ruff_cache/
 .venv/
 venv/
+*.egg-info/
 node_modules/
 node_modules.pnpm-broken*/
+.pnpm-store/
 dist/
 .env
+README.local.md
+docs/*.local.md
 data/files/
+backend/data/files/
+tools/ffmpeg/
+.idea/
 *.log

@@ -78,8 +78,8 @@ ASR_MAX_DURATION_SEC=300
 ASR_MAX_PAYLOAD_BYTES=10485760
 ASR_SEGMENT_DURATION_SEC=30
 ASR_REQUEST_TIMEOUT_SEC=60
-FFMPEG_PATH=C:\Users\36183\Desktop\working\demo3\tools\ffmpeg\bin\ffmpeg.exe
-FFPROBE_PATH=C:\Users\36183\Desktop\working\demo3\tools\ffmpeg\bin\ffprobe.exe
+FFMPEG_PATH=
+FFPROBE_PATH=
 FRONTEND_ORIGIN=http://localhost:5173
 FRONTEND_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
 ```
@@ -671,9 +671,9 @@ CREATE DATABASE "live-stream-clip-agent";
 后端 API：
 
 ```powershell
-cd C:\Users\36183\Desktop\working\demo3\backend
+cd C:\Users\你的用户名\Desktop\working\demo3\backend
 .\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
-``
+```
 
 后端启动必须使用本项目 `backend\.venv` 内的 Python，不使用系统全局 Python。
 
@@ -682,7 +682,7 @@ cd C:\Users\36183\Desktop\working\demo3\backend
 RQ worker：
 
 ```powershell
-cd C:\Users\36183\Desktop\working\demo3\backend
+cd C:\Users\你的用户名\Desktop\working\demo3\backend
 .\.venv\Scripts\python.exe scripts/run_worker.py
 ```
 
@@ -691,14 +691,14 @@ cd C:\Users\36183\Desktop\working\demo3\backend
 如需在终端查看完整建表 SQL：
 
 ```powershell
-cd C:\Users\36183\Desktop\working\demo3\backend
+cd C:\Users\你的用户名\Desktop\working\demo3\backend
 .\.venv\Scripts\python.exe scripts/init_db.py
 ```
 
 前端：
 
 ```powershell
-cd C:\Users\36183\Desktop\working\demo3\frontend
+cd C:\Users\你的用户名\Desktop\working\demo3\frontend
 pnpm install
 pnpm dev
 ```
@@ -716,8 +716,8 @@ http://127.0.0.1:5173
 后端核心单元测试：
 
 ```powershell
-cd C:\Users\36183\Desktop\working\demo3\backend
-.\.venv\Scripts\python.exe -m unittest discover -s tests -t .
+cd C:\Users\你的用户名\Desktop\working\demo3\backend
+.\.venv\Scripts\python.exe -m pytest tests
 ```
 
 验收流程：
