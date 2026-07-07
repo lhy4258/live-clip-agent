@@ -205,10 +205,3 @@ cd C:\Users\你的用户名\Desktop\working\demo3\backend
 docs/technical-design.md
 ```
 
-未完成事项清单：
-
-```text
-docs/remaining-work.md
-```
-
-完成一项后，直接删除 `docs/remaining-work.md` 中对应条目。
